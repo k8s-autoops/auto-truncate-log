@@ -1,15 +1,19 @@
 package main
 
 import (
+	"github.com/robfig/cron/v3"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"syscall"
 )
 
 var (
-	envDry, _ = strconv.ParseBool(os.Getenv("DRY"))
+	envDry, _  = strconv.ParseBool(os.Getenv("CFG_DRY"))
+	envOnce, _ = strconv.ParseBool(os.Getenv("CFG_ONCE"))
 )
 
 var (
@@ -43,6 +47,25 @@ func isHistoryLogFile(path string) bool {
 }
 
 func main() {
+	if envOnce {
+		execute()
+	}
+
+	c := cron.New()
+	if _, err := c.AddFunc(os.Getenv("CFG_CRON"), execute); err != nil {
+		log.Println("failed to initialize cron:", err.Error())
+		os.Exit(1)
+	}
+	c.Start()
+	defer c.Stop()
+
+	chSig := make(chan os.Signal, 1)
+	signal.Notify(chSig, syscall.SIGTERM, syscall.SIGINT)
+	sig := <-chSig
+	log.Println("signal caught:", sig.String())
+}
+
+func execute() {
 	err := filepath.Walk("/mnt", func(path string, info os.FileInfo, err error) error {
 		// ignore error
 		if err != nil {
@@ -81,7 +104,6 @@ func main() {
 		return nil
 	})
 	if err != nil {
-		log.Println("exited with error:", err.Error())
-		os.Exit(1)
+		log.Println("failed to iterate files:", err.Error())
 	}
 }
