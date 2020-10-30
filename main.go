@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/robfig/cron/v3"
 	"log"
 	"os"
@@ -8,17 +9,25 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"syscall"
+	"time"
 )
 
 var (
 	envDry, _  = strconv.ParseBool(os.Getenv("CFG_DRY"))
 	envOnce, _ = strconv.ParseBool(os.Getenv("CFG_ONCE"))
-)
 
-var (
-	patternLogFile        = regexp.MustCompile(`(?i)\.log$`)
-	patternHistoryLogFile = []*regexp.Regexp{
+	now = time.Now()
+
+	todayMarks = []string{
+		fmt.Sprintf("%04d-%02d-%02d", now.Year(), now.Month(), now.Day()),
+		fmt.Sprintf("%04d.%02d.%02d", now.Year(), now.Month(), now.Day()),
+		fmt.Sprintf("%04d_%02d_%02d", now.Year(), now.Month(), now.Day()),
+	}
+
+	regexpLogFile           = regexp.MustCompile(`(?i)\.log$`)
+	regexpHistoricalLogFile = []*regexp.Regexp{
 		regexp.MustCompile(`(?i)ROT.+\.log.*$`),
 		regexp.MustCompile(`(?i)\.log.*\.gz.*$`),
 		regexp.MustCompile(`(?i)\.log[_.-]\d+$`),
@@ -28,22 +37,29 @@ var (
 	}
 )
 
-func isActiveLogFile(path string) bool {
-	for _, p := range patternHistoryLogFile {
-		if p.MatchString(path) {
-			return false
-		}
-	}
-	return patternLogFile.MatchString(path)
-}
+type FileType int
 
-func isHistoryLogFile(path string) bool {
-	for _, p := range patternHistoryLogFile {
-		if p.MatchString(path) {
-			return true
+const (
+	FileTypeNone FileType = iota
+	FileTypeActiveLog
+	FileTypeHistoryLog
+)
+
+func determineFileType(name string) FileType {
+	for _, p := range regexpHistoricalLogFile {
+		if p.MatchString(name) {
+			for _, todayMark := range todayMarks {
+				if strings.Contains(name, todayMark) {
+					return FileTypeActiveLog
+				}
+			}
+			return FileTypeHistoryLog
 		}
 	}
-	return false
+	if regexpLogFile.MatchString(name) {
+		return FileTypeActiveLog
+	}
+	return FileTypeNone
 }
 
 func main() {
@@ -76,8 +92,10 @@ func execute() {
 		if info.Mode()&os.ModeType != 0 {
 			return nil
 		}
-		if isActiveLogFile(info.Name()) {
-			// truncate active log file
+		// determine file type
+		fileType := determineFileType(info.Name())
+		switch fileType {
+		case FileTypeActiveLog:
 			if envDry {
 				log.Printf("%s: will truncate", path)
 				return nil
@@ -87,9 +105,7 @@ func execute() {
 			} else {
 				log.Printf("%s: truncated", path)
 			}
-			return nil
-		} else if isHistoryLogFile(info.Name()) {
-			// delete history log file
+		case FileTypeHistoryLog:
 			if envDry {
 				log.Printf("%s: will delete", path)
 				return nil
@@ -99,7 +115,8 @@ func execute() {
 			} else {
 				log.Printf("%s: deleted", path)
 			}
-			return nil
+		default:
+			log.Printf("%s: ignored", path)
 		}
 		return nil
 	})

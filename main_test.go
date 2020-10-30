@@ -2,6 +2,12 @@ package main
 
 import "testing"
 
+func Test_TodayMarks(t *testing.T) {
+	for _, todayMark := range todayMarks {
+		t.Log(todayMark)
+	}
+}
+
 func Test_isActiveLogFile(t *testing.T) {
 	type args struct {
 		path string
@@ -63,7 +69,7 @@ func Test_isActiveLogFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isActiveLogFile(tt.args.path); got != tt.want {
+			if got := determineFileType(tt.args.path); got == FileTypeActiveLog != tt.want {
 				t.Errorf("isActiveLogFile() = %v, want %v", got, tt.want)
 			}
 		})
@@ -131,7 +137,7 @@ func Test_isHistoryLogFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isHistoryLogFile(tt.args.path); got != tt.want {
+			if got := determineFileType(tt.args.path); got == FileTypeHistoryLog != tt.want {
 				t.Errorf("isHistoryLogFile() = %v, want %v", got, tt.want)
 			}
 		})
