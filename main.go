@@ -17,6 +17,7 @@ import (
 var (
 	envDry, _  = strconv.ParseBool(os.Getenv("CFG_DRY"))
 	envOnce, _ = strconv.ParseBool(os.Getenv("CFG_ONCE"))
+	envCron    = strings.TrimSpace(os.Getenv("CFG_CRON"))
 
 	now = time.Now()
 
@@ -33,6 +34,7 @@ var (
 		regexp.MustCompile(`(?i)\.log[_.-]\d+$`),
 		regexp.MustCompile(`(?i)\.log[_.-]\d{4}[_.-]\d{2}[_.-]\d{2}.*$`),
 		regexp.MustCompile(`(?i)[_.-]\d+\.log$`),
+		regexp.MustCompile(`(?i)\.log[_.-]\d+$`),
 		regexp.MustCompile(`(?i)\d{4}[_.-]\d{2}[_.-]\d{2}.*\.log$`),
 	}
 )
@@ -67,13 +69,15 @@ func main() {
 		execute()
 	}
 
-	c := cron.New()
-	if _, err := c.AddFunc(os.Getenv("CFG_CRON"), execute); err != nil {
-		log.Println("failed to initialize cron:", err.Error())
-		os.Exit(1)
+	if envCron != "" {
+		c := cron.New()
+		if _, err := c.AddFunc(envCron, execute); err != nil {
+			log.Println("failed to initialize cron:", err.Error())
+			os.Exit(1)
+		}
+		c.Start()
+		defer c.Stop()
 	}
-	c.Start()
-	defer c.Stop()
 
 	chSig := make(chan os.Signal, 1)
 	signal.Notify(chSig, syscall.SIGTERM, syscall.SIGINT)

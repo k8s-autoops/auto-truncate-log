@@ -25,6 +25,13 @@ func Test_isActiveLogFile(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "test-1-1",
+			args: args{
+				path: "hello.log.1",
+			},
+			want: false,
+		},
+		{
 			name: "test-2",
 			args: args{
 				path: "hello.log.gz",
@@ -91,6 +98,13 @@ func Test_isHistoryLogFile(t *testing.T) {
 				path: "hello.log",
 			},
 			want: false,
+		},
+		{
+			name: "test-1-1",
+			args: args{
+				path: "hello.log.1",
+			},
+			want: true,
 		},
 		{
 			name: "test-2",
